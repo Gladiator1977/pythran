@@ -1,0 +1,80 @@
+import cv2
+import numpy as np
+from numpy.linalg import inv
+
+
+def removeGradient(img, dir):
+	''' Remove Gradient Vertically'''
+	if dir == "Vert":
+		num = len(img[:,1])
+	else:
+		num = len(img[1,:])
+	A3 = np.ones(num)
+	A2 = np.array(range(num))
+	A1 = A2**2
+
+	AT = np.concatenate((A1, A2, A3), axis=0).reshape((3, num))
+	A = np.transpose(AT)
+
+	FinalMatrix = np.dot(inv(np.dot(AT,A)),AT)
+
+	for i in range(num):
+		if dir == "Vert":
+			yData = img[:,i]
+		else:
+			yData = img[i,:]
+
+		CeoffMatrix = np.dot(FinalMatrix, yData)
+		fitData = CeoffMatrix[0]*A1 + CeoffMatrix[1] * A2  + CeoffMatrix[2]
+
+
+		if dir == "Vert":
+			img[:,i] = np.abs(img[:,i] - fitData)
+		else:
+			img[i,:] = np.abs(img[i,:] - fitData)
+
+	return img
+
+def detectEdges(img, kernelSize):
+	#img = cv2.Laplacian(img,cv2.CV_64F)
+	img = cv2.Sobel(img,cv2.CV_64F,1,0,ksize=kernelSize)
+	img = cv2.Sobel(img,cv2.CV_64F,0,1,ksize=kernelSize)	
+	return img
+
+def fft_HPF(img, filterSize):
+	'''FFT hight pass filter:
+	filterSize = 5 - for RGB
+	filterSize = 2 - for IR '''
+	windowSize = filterSize
+	f = np.fft.fft2(img)
+	fshift = np.fft.fftshift(f)
+	magnitude_spectrum = 20*np.log(np.abs(fshift))
+
+	rows, cols = img.shape
+	crow,ccol = int(rows/2) , int(cols/2)
+	fshift[crow-windowSize:crow+windowSize, ccol-windowSize:ccol+windowSize] = 0
+	f_ishift = np.fft.ifftshift(fshift)
+	img_back = np.fft.ifft2(f_ishift)
+	img_back = np.abs(img_back)
+	return img_back
+
+def strengthening(img, treshold, power = 1):
+	img = img**power
+	maxim = np.max(img)
+	img[img<treshold * maxim] = 0
+	return img
+
+def morphology(img, ker, iter = 1):
+	
+	img = cv2.erode(img,ker,iterations = iter)
+	#img = cv2.dilate(img,ker,iterations=iter)
+	#img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, ker, iterations = iter)
+
+	#img = cv2.morphologyEx(img, cv2.MORPH_OPEN, ker, iterations = iter)
+	return img
+
+def imageBluring(img):
+	img = img.astype(np.uint8)
+	img= cv2.medianBlur(img,7)
+	#img = cv2.bilateralFilter(img,9,75,75)
+	return img
